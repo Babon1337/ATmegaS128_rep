@@ -8,6 +8,7 @@
 #include "init.h"
 #include "GPIOdrv.h"
 #include "TIMERdrv.h"
+#include "SPIdrv.h"
 #include <avr/interrupt.h>
 
 int User_System_Init(void) {
@@ -17,6 +18,9 @@ int User_System_Init(void) {
 
 	if(InitTIMER() != 0)
 		return -2;
+
+	if(InitSPI(1e6) != 0)
+		return -4;
 
 	if(InitWatchDog() != 0)
 		return -3;
