@@ -22,7 +22,7 @@ static uint8_t SPI_FIFO_TX[SPI_FIFO_TX_SIZE];
 static uint16_t SPI_FIFO_TX_Tail = 0;
 static uint16_t SPI_FIFO_TX_Head = 0;
 
-/* Инициализация SPI0 в режиме мастер */
+/* Инициализация SPI в режиме мастер */
 // TODO: доработать функцию для работы в режиме slave, а так же различными настройками
 int InitSPI(const uint32_t baudrate) {
 	
@@ -112,9 +112,8 @@ int SPIM_irq_write(const uint8_t* data, const unsigned int size) {
 	return i;
 }
 
-// Обработчик прерывания
-// TODO: разобраться почему объявления _VECTOR в коде ядра и в даташите не совпадают
-ISR(_VECTOR(0x22)) {
+// Обработчик прерывания, вызывается когда закончена передача данных
+ISR(_VECTOR(SPI_STC_vect_num)) {
 	// Проверяем статус передачи
 	if((SPSR & (1 << 6)) == (1 << 6)) {
 		// Проверяем что в буфере еще есть данные
@@ -125,6 +124,6 @@ ISR(_VECTOR(0x22)) {
 		// Передаем данные
 		SPDR = SPI_FIFO_TX[SPI_FIFO_TX_Tail];
 		SPI_FIFO_TX_Tail++;
-		SPI_FIFO_TX_Tail &= (SPI_FIFO_TX_SIZE-1);	
+		SPI_FIFO_TX_Tail &= (SPI_FIFO_TX_SIZE-1);
 	}
 }
