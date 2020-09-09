@@ -8,10 +8,19 @@
 #include <avr/io.h>
 #include <stdint.h>
 #include "SPIdrv.h"
+#include <avr/interrupt.h>
 
+// Определения для передачи по SPI в режиме ожидания
 #define CS_ENABLE		PORTB &=~ (1 << 0)
 #define CS_DISABLE		PORTB |= (1 << 0)
 #define SPI_WAITING_DR	1000
+
+// Определения для передачи по SPI внутри прерваний
+//static uint8_t SPI_FIFO_RX[128];	// временно реализована только передача
+#define SPI_FIFO_TX_SIZE	128
+static uint8_t SPI_FIFO_TX[SPI_FIFO_TX_SIZE];
+static uint16_t SPI_FIFO_TX_Tail = 0;
+static uint16_t SPI_FIFO_TX_Head = 0;
 
 /* Инициализация SPI0 в режиме мастер */
 // TODO: доработать функцию для работы в режиме slave, а так же различными настройками
@@ -67,7 +76,7 @@ int InitSPI(const uint32_t baudrate) {
 		SPSR = 0;
 	}
 	// SPE - включение SPI, MSTR - включение режима мастер
-	SPCR |= (1 << SPE) | (1 << MSTR);
+	SPCR |= (1 << SPE) | (1 << MSTR) | (1 << SPIE);
 
 	return 0;
 }
@@ -86,4 +95,36 @@ int SPIM_write(const uint8_t* data, const unsigned int size)
 	}
 	CS_DISABLE;
 	return i;
+}
+
+int SPIM_irq_write(const uint8_t* data, const unsigned int size) {
+	unsigned int i;
+	// Проверяем размер входного буфера
+	if(size >= SPI_FIFO_TX_SIZE)
+		return -1;
+	CS_ENABLE;
+	SPDR = data[0];
+	for(i = 1; i < size; i++) {
+		SPI_FIFO_TX[SPI_FIFO_TX_Head] = data[i];
+		SPI_FIFO_TX_Head++;
+		SPI_FIFO_TX_Head &= (SPI_FIFO_TX_SIZE-1);
+	}
+	return i;
+}
+
+// Обработчик прерывания
+// TODO: разобраться почему объявления _VECTOR в коде ядра и в даташите не совпадают
+ISR(_VECTOR(0x22)) {
+	// Проверяем статус передачи
+	if((SPSR & (1 << 6)) == (1 << 6)) {
+		// Проверяем что в буфере еще есть данные
+		if(SPI_FIFO_TX_Tail == SPI_FIFO_TX_Head) {
+			CS_DISABLE;
+			return;
+		}
+		// Передаем данные
+		SPDR = SPI_FIFO_TX[SPI_FIFO_TX_Tail];
+		SPI_FIFO_TX_Tail++;
+		SPI_FIFO_TX_Tail &= (SPI_FIFO_TX_SIZE-1);	
+	}
 }

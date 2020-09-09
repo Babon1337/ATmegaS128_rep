@@ -16,6 +16,7 @@
 
 	int InitSPI(const uint32_t baudrate);
 	int SPIM_write(const uint8_t* data, const unsigned int size);
+	int SPIM_irq_write(const uint8_t* data, const unsigned int size);
 
 #ifdef __cplusplus
 	}
