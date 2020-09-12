@@ -39,7 +39,7 @@ int InitSPI(const uint32_t baudrate) {
 	CS_DISABLE;
 
 	//SPR0 - делитель частоты шины см. таблицу 22-5 даташита
-	uint8_t val = 8e6 / baudrate;
+	uint32_t val = 8e6 / baudrate;
 	if(val == 2)
 	{
 		SPCR = 0;
@@ -75,8 +75,14 @@ int InitSPI(const uint32_t baudrate) {
 		SPCR = 3;
 		SPSR = 0;
 	}
+	else
+	{
+		SPCR = 3;
+		SPSR = 0;
+	}
+
 	// SPE - включение SPI, MSTR - включение режима мастер
-	SPCR |= (1 << SPE) | (1 << MSTR) | (1 << SPIE);
+	SPCR |= (1 << SPE) | (1 << MSTR);
 
 	return 0;
 }
@@ -102,9 +108,9 @@ int SPIM_irq_write(const uint8_t* data, const unsigned int size) {
 	// Проверяем размер входного буфера
 	if(size >= SPI_FIFO_TX_SIZE)
 		return -1;
+	SPCR |= (1 << SPIE);
 	CS_ENABLE;
-	SPDR = data[0];
-	for(i = 1; i < size; i++) {
+	for(i = 0; i < size; i++) {
 		SPI_FIFO_TX[SPI_FIFO_TX_Head] = data[i];
 		SPI_FIFO_TX_Head++;
 		SPI_FIFO_TX_Head &= (SPI_FIFO_TX_SIZE-1);
@@ -119,6 +125,7 @@ ISR(_VECTOR(SPI_STC_vect_num)) {
 		// Проверяем что в буфере еще есть данные
 		if(SPI_FIFO_TX_Tail == SPI_FIFO_TX_Head) {
 			CS_DISABLE;
+			SPCR &=~ (1 << SPIE);
 			return;
 		}
 		// Передаем данные
